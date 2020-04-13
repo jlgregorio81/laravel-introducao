@@ -1,0 +1,208 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use ArrayObject;
+use Illuminate\Http\Request;
+use stdClass;
+
+class ClientCtr extends Controller
+{
+
+
+    public function createClients()
+    {
+        // $clients = new ArrayObject(); //..cria um novo Array de Objetos
+
+        $clients = [];
+
+        $client = new stdClass; //..cria um objeto Standard
+        $client->id = 1;
+        $client->name = 'Mark';
+        $client->age = 40;
+        $clients[] = $client; //..adiciona no ArrayObject
+
+        $client = new stdClass;
+        $client->id = 2;
+        $client->name = 'John';
+        $client->age = 32;
+        $clients[] = $client;
+
+        return $clients; //..retorna os clientes inseridos
+    }
+
+    public function __construct()
+    {
+        if (!session('clients')) { //..se não exitir a sessão clients, então...
+            //..cria a sessão clients e armazena clientes predefinidos
+            session(['clients' => $this->createClients()]);
+        }
+    }
+
+    /**
+     * Display a listing of the resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function index()
+    {
+        return view('client.index')
+            ->with('clients', session('clients'));
+    }
+
+    /**
+     * Show the form for creating a new resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function create()
+    {
+        return view('client.create')->with('action', 'client.store');
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function store(Request $request)
+    {
+        //..cria um array para definir as regras
+        $rules = [
+            'name' => 'required|max:20|',
+            'age' => 'required|numeric|between:18,30'
+        ];
+        //..cria um array com mensagens personalizadas
+        $messages = [
+            'required' => 'O campo :attribute precisa ser preenchido!',
+            'between' => 'O campo :attribute deve estar entre 18 e 30!'
+        ]; 
+        //..executa a validação, passando as mensagens
+        $request->validate($rules, $messages);
+
+
+        $clients = session('clients'); //..recupera os clientes da sessão
+        $lastId = 0; //..variável pra controlar o id
+        if ($clients) { //..se houver clientes, então pega o último id
+            $lastIndex = count($clients) - 1;
+            $lastId = $clients[$lastIndex]->id;
+        }
+        $c = new stdClass; //..cria uma nova classe standard
+        $c->id = $lastId + 1; //..insere o id incrementado;
+        $c->name = $request->input('name'); //..pega o nome do input do form
+        $c->age = $request->input('age'); //..pega a idade do input do form
+        $clients[] = $c; //..adicione o novo cliente 
+
+        session(['clients' => $clients]); //..atualiza os dados da sessão
+
+        //..retorna a view de cliente com a variável clients atualizada
+        return view('client.index')
+            ->with('clients', session('clients'));
+    }
+
+    /**
+     * Display the specified resource.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function show($id)
+    {
+        //..recupera os clientes da seção
+        $clients = session('clients');
+        //..faz uma busca pelo objeto
+        $obj = $this->arrayFind($clients, $id);
+        //..se encontrado, então retorna uma view com o objeto
+        if ($obj) {
+            return view('client.show')->with('client', $obj);
+        } else {
+            //..senão mostra a página de erro
+            abort(404);
+        }
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function edit($id)
+    {
+        //..pega os clientes da sessão
+        $clients = session('clients');
+        //..encontra o cliente com o id específico
+        $c = $this->arrayFind($clients, $id);
+        //..retorna a view com o registro encontrado
+        return view('client.update')->with('client', $c);
+    }
+
+    /**
+     * Update the specified resource in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function update(Request $request, $id)
+    {
+        //..pega os clientes da sessão
+        $clients = session('clients');
+        //..pega o índice do cliente 
+        $i = $this->arraySearch($clients, 'id', $id);
+        //..atualiza os dados
+        $clients[$i]->name = $request->input('name');
+        $clients[$i]->age = $request->input('age');
+        //..atualiza os dados da sessão
+        session(['clients' => $clients]);
+        //..retorna a view com os clientes atualizados
+        return view('client.index')->with('clients', session('clients'));
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function destroy($id)
+    {
+        $clients = session('clients'); //..pega os clientes da sessão
+        $i = $this->arraySearch($clients, 'id', $id); //..localiza o índice do registro       
+        if ($i >= 0) { //..se é maior ou igual a zero            
+            unset($clients[$i]); //..exclui do array
+            $clients = array_values($clients); //..reorganiza o array
+            session(['clients' => $clients]); //..atualiza os registros na sessão
+        }
+        //..retorna a view contendo os dados atualizados
+        return view('client.index')->with('clients', session('clients'));
+    }
+
+
+    function arraySearch($array, $key, $search)
+    {
+        if ($array) {
+            $i = 0;
+            foreach ($array as $obj) {
+                if ($obj->$key == $search) {
+                    return $i;
+                }
+                $i++;
+            }
+            return -1;
+        }
+    }
+
+    function arrayFind($array, $id)
+    {
+        if ($array) {
+            foreach ($array as $obj) {
+                if ($obj->id == $id)
+                    return $obj;
+            }
+            return null;
+        }
+    }
+
+}
